@@ -232,6 +232,30 @@ def get_fuel():
     finally:
         conn.close()
 
+@app.get("/api/fuel/analytics")
+def fuel_analytics():
+    conn = get_db()
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                fuel_type,
+                ROUND(SUM(liters), 2) AS total_liters,
+                ROUND(SUM(amount), 2) AS total_cost
+            FROM fact_fuel
+            GROUP BY fuel_type
+            ORDER BY total_cost DESC
+            """
+        ).fetchall()
+
+        return {
+            "fuel_analytics": [dict(row) for row in rows]
+        }
+
+    finally:
+        conn.close()
+
 @app.get("/api/maintenance")
 def get_maintenance():
     conn = get_db()
@@ -304,7 +328,7 @@ def fleet_status():
 
     finally:
         conn.close()
-        
+
 @app.get("/api/delivery-performance")
 def delivery_performance():
     conn = get_db()

@@ -1,4 +1,14 @@
 import { useEffect, useState } from "react"
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from "recharts"
+
 import "./App.css"
 import "leaflet/dist/leaflet.css"
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
@@ -12,6 +22,7 @@ function App() {
   const [maintenance, setMaintenance] = useState([])
   const [fleetStatus, setFleetStatus] = useState(null)
   const [deliveryPerformance, setDeliveryPerformance] = useState(null)
+  const [fuelAnalytics, setFuelAnalytics] = useState([])
 
   useEffect(() => {
   fetch("http://127.0.0.1:8002/api/dashboard")
@@ -33,6 +44,13 @@ function App() {
   .then((response) => response.json())
   .then((data) => setFuel(data.fuel))
   .catch((error) => console.error("Fuel API Error:", error))
+
+  fetch("http://127.0.0.1:8002/api/fuel/analytics")
+  .then((response) => response.json())
+  .then((data) => setFuelAnalytics(data.fuel_analytics))
+  .catch((error) =>
+    console.error("Fuel Analytics API Error:", error)
+  )
 
   fetch("http://127.0.0.1:8002/api/maintenance")
   .then((response) => response.json())
@@ -132,6 +150,21 @@ function App() {
           </div>
 
         </div>
+        <section className="fuel-analytics-section">
+  <h2>Fuel Analytics</h2>
+
+  <div className="fuel-chart-card">
+    <ResponsiveContainer width="100%" height={350}>
+      <BarChart data={fuelAnalytics}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="fuel_type" />
+        <YAxis />
+        <Tooltip />
+        <Bar dataKey="total_liters" name="Fuel Liters" />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+</section>
         <section className="delivery-performance-section">
   <h2>Delivery Performance</h2>
 

@@ -262,6 +262,7 @@ def get_maintenance():
 
     finally:
         conn.close()
+
 @app.get("/api/fleet/status")
 def fleet_status():
     conn = get_db()
@@ -299,6 +300,50 @@ def fleet_status():
             "idle": idle,
             "stopped": stopped,
             "total": len(rows)
+        }
+
+    finally:
+        conn.close()
+        
+@app.get("/api/delivery-performance")
+def delivery_performance():
+    conn = get_db()
+
+    try:
+        row = conn.execute(
+            """
+            SELECT
+                SUM(
+                    CASE
+                        WHEN scan_status = 'delivered' THEN 1
+                        ELSE 0
+                    END
+                ) AS delivered,
+                SUM(
+                    CASE
+                        WHEN scan_status = 'delayed' THEN 1
+                        ELSE 0
+                    END
+                ) AS delayed
+            FROM fact_delivery
+            """
+        ).fetchone()
+
+        delivered = row["delivered"] or 0
+        delayed = row["delayed"] or 0
+
+        completed = delivered + delayed
+
+        on_time_rate = 0
+
+        if completed > 0:
+            on_time_rate = round((delivered / completed) * 100, 2)
+
+        return {
+            "total_deliveries": completed,
+            "delivered": delivered,
+            "delayed": delayed,
+            "on_time_rate_percent": on_time_rate
         }
 
     finally:

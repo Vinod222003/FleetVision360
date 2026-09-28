@@ -11,6 +11,7 @@ function App() {
   const [fuel, setFuel] = useState([])
   const [maintenance, setMaintenance] = useState([])
   const [fleetStatus, setFleetStatus] = useState(null)
+  const [deliveryPerformance, setDeliveryPerformance] = useState(null)
 
   useEffect(() => {
   fetch("http://127.0.0.1:8002/api/dashboard")
@@ -42,6 +43,12 @@ function App() {
   .then((response) => response.json())
   .then((data) => setFleetStatus(data))
   .catch((error) => console.error("Fleet Status API Error:", error))
+
+  fetch("http://127.0.0.1:8002/api/delivery-performance")
+  .then((response) => response.json())
+  .then((data) => setDeliveryPerformance(data))
+  .catch((error) =>
+    console.error("Delivery Performance API Error:", error))
 }, [])
 
   if (!dashboard) {
@@ -125,6 +132,33 @@ function App() {
           </div>
 
         </div>
+        <section className="delivery-performance-section">
+  <h2>Delivery Performance</h2>
+
+  <div className="delivery-performance-card">
+    <div>
+      <p>Total Completed Deliveries</p>
+      <h3>{deliveryPerformance?.total_deliveries ?? 0}</h3>
+    </div>
+
+    <div>
+      <p>Delivered</p>
+      <h3>{deliveryPerformance?.delivered ?? 0}</h3>
+    </div>
+
+    <div>
+      <p>Delayed</p>
+      <h3>{deliveryPerformance?.delayed ?? 0}</h3>
+    </div>
+
+    <div>
+      <p>Delivery Performance</p>
+      <h3>
+        {deliveryPerformance?.on_time_rate_percent ?? 0}%
+      </h3>
+    </div>
+  </div>
+</section>
         <section className="fleet-status-section">
   <h2>Fleet Status</h2>
 

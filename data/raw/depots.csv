@@ -1,0 +1,11 @@
+depot_id,depot_name,city,capacity
+D001,Bengaluru Central Depot,Bengaluru,108
+D002,Mysuru Central Depot,Mysuru,86
+D003,Chennai Central Depot,Chennai,150
+D004,Hyderabad Central Depot,Hyderabad,142
+D005,Pune Central Depot,Pune,137
+D006,Tumakuru Central Depot,Tumakuru,115
+D007,Hosur Central Depot,Hosur,106
+D008,Mangaluru Central Depot,Mangaluru,219
+D009,Hubballi Central Depot,Hubballi,102
+D010,Coimbatore Central Depot,Coimbatore,188

@@ -1,0 +1,101 @@
+vehicle_id,type,depot,capacity,model,fuel_capacity_liters
+V001,Van,D001,500,Tata Ace EV,45
+V002,Van,D004,2500,Tata Ace EV,45
+V003,Heavy Truck,D009,750,Ashok Leyland 1015,180
+V004,Truck,D010,500,Ashok Leyland Dost,120
+V005,Truck,D007,1000,Ashok Leyland Dost,120
+V006,Truck,D004,500,Ashok Leyland Dost,120
+V007,Van,D007,1000,Maruti Eeco,45
+V008,Truck,D010,500,Tata 407,120
+V009,Van,D009,1500,Tata Ace EV,45
+V010,Truck,D009,5000,Tata 407,120
+V011,Mini Truck,D010,5000,Tata Ace Gold,60
+V012,Mini Truck,D001,1000,Tata Ace Gold,60
+V013,Van,D004,1500,Maruti Eeco,45
+V014,Truck,D008,750,Tata 407,120
+V015,Mini Truck,D006,5000,Mahindra Jeeto,60
+V016,Mini Truck,D002,2500,Tata Ace Gold,60
+V017,Heavy Truck,D003,1500,Ashok Leyland 1015,180
+V018,Mini Truck,D009,5000,Mahindra Jeeto,60
+V019,Mini Truck,D001,500,Mahindra Jeeto,60
+V020,Truck,D007,500,Ashok Leyland Dost,120
+V021,Truck,D010,750,Tata 407,120
+V022,Heavy Truck,D007,750,Ashok Leyland 1015,180
+V023,Mini Truck,D003,5000,Mahindra Jeeto,60
+V024,Heavy Truck,D010,2500,Ashok Leyland 1015,180
+V025,Mini Truck,D006,750,Mahindra Jeeto,60
+V026,Van,D002,500,Tata Ace EV,45
+V027,Heavy Truck,D003,2500,Tata 709,180
+V028,Heavy Truck,D007,2500,Ashok Leyland 1015,180
+V029,Truck,D009,2500,Ashok Leyland Dost,120
+V030,Truck,D002,5000,Tata 407,120
+V031,Truck,D002,1500,Ashok Leyland Dost,120
+V032,Van,D008,5000,Maruti Eeco,45
+V033,Mini Truck,D009,2500,Tata Ace Gold,60
+V034,Mini Truck,D005,750,Mahindra Jeeto,60
+V035,Van,D003,2500,Maruti Eeco,45
+V036,Van,D008,500,Maruti Eeco,45
+V037,Mini Truck,D005,500,Tata Ace Gold,60
+V038,Van,D010,500,Maruti Eeco,45
+V039,Mini Truck,D002,750,Mahindra Jeeto,60
+V040,Mini Truck,D009,1000,Mahindra Jeeto,60
+V041,Mini Truck,D004,5000,Mahindra Jeeto,60
+V042,Truck,D007,1500,Tata 407,120
+V043,Mini Truck,D002,750,Tata Ace Gold,60
+V044,Van,D006,2500,Tata Ace EV,45
+V045,Mini Truck,D010,500,Tata Ace Gold,60
+V046,Mini Truck,D001,500,Tata Ace Gold,60
+V047,Van,D006,2500,Tata Ace EV,45
+V048,Heavy Truck,D005,750,Tata 709,180
+V049,Heavy Truck,D010,750,Ashok Leyland 1015,180
+V050,Mini Truck,D007,500,Tata Ace Gold,60
+V051,Truck,D007,1500,Tata 407,120
+V052,Van,D008,5000,Tata Ace EV,45
+V053,Heavy Truck,D001,5000,Ashok Leyland 1015,180
+V054,Mini Truck,D002,750,Tata Ace Gold,60
+V055,Heavy Truck,D009,750,Ashok Leyland 1015,180
+V056,Truck,D003,1500,Ashok Leyland Dost,120
+V057,Heavy Truck,D002,2500,Tata 709,180
+V058,Van,D001,500,Tata Ace EV,45
+V059,Heavy Truck,D003,1500,Ashok Leyland 1015,180
+V060,Heavy Truck,D004,500,Tata 709,180
+V061,Van,D007,1500,Maruti Eeco,45
+V062,Truck,D008,1500,Tata 407,120
+V063,Mini Truck,D003,1000,Tata Ace Gold,60
+V064,Van,D001,5000,Maruti Eeco,45
+V065,Van,D001,2500,Maruti Eeco,45
+V066,Mini Truck,D009,500,Tata Ace Gold,60
+V067,Van,D003,2500,Tata Ace EV,45
+V068,Heavy Truck,D004,500,Tata 709,180
+V069,Van,D010,2500,Tata Ace EV,45
+V070,Truck,D007,1000,Ashok Leyland Dost,120
+V071,Mini Truck,D006,1000,Mahindra Jeeto,60
+V072,Truck,D003,1500,Tata 407,120
+V073,Van,D002,1500,Tata Ace EV,45
+V074,Mini Truck,D002,2500,Mahindra Jeeto,60
+V075,Truck,D003,500,Ashok Leyland Dost,120
+V076,Truck,D006,750,Tata 407,120
+V077,Truck,D009,2500,Ashok Leyland Dost,120
+V078,Truck,D009,5000,Ashok Leyland Dost,120
+V079,Truck,D003,500,Ashok Leyland Dost,120
+V080,Mini Truck,D009,1000,Mahindra Jeeto,60
+V081,Mini Truck,D010,5000,Mahindra Jeeto,60
+V082,Truck,D004,2500,Tata 407,120
+V083,Van,D005,500,Maruti Eeco,45
+V084,Van,D005,500,Maruti Eeco,45
+V085,Truck,D003,750,Tata 407,120
+V086,Heavy Truck,D009,2500,Tata 709,180
+V087,Van,D002,5000,Tata Ace EV,45
+V088,Van,D009,1000,Tata Ace EV,45
+V089,Mini Truck,D007,500,Mahindra Jeeto,60
+V090,Van,D006,1000,Tata Ace EV,45
+V091,Van,D004,1000,Maruti Eeco,45
+V092,Mini Truck,D010,750,Tata Ace Gold,60
+V093,Heavy Truck,D003,500,Tata 709,180
+V094,Heavy Truck,D006,5000,Tata 709,180
+V095,Mini Truck,D005,5000,Tata Ace Gold,60
+V096,Van,D007,1500,Tata Ace EV,45
+V097,Heavy Truck,D004,1000,Ashok Leyland 1015,180
+V098,Mini Truck,D004,500,Tata Ace Gold,60
+V099,Truck,D007,1000,Ashok Leyland Dost,120
+V100,Truck,D005,5000,Tata 407,120

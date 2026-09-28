@@ -23,6 +23,7 @@ function App() {
   const [fleetStatus, setFleetStatus] = useState(null)
   const [deliveryPerformance, setDeliveryPerformance] = useState(null)
   const [fuelAnalytics, setFuelAnalytics] = useState([])
+  const [maintenanceAnalytics, setMaintenanceAnalytics] = useState([])
 
   useEffect(() => {
   fetch("http://127.0.0.1:8002/api/dashboard")
@@ -50,6 +51,13 @@ function App() {
   .then((data) => setFuelAnalytics(data.fuel_analytics))
   .catch((error) =>
     console.error("Fuel Analytics API Error:", error)
+  )
+
+  fetch("http://127.0.0.1:8002/api/maintenance/analytics")
+  .then((response) => response.json())
+  .then((data) => setMaintenanceAnalytics(data.maintenance_analytics))
+  .catch((error) =>
+    console.error("Maintenance Analytics API Error:", error)
   )
 
   fetch("http://127.0.0.1:8002/api/maintenance")
@@ -190,6 +198,52 @@ function App() {
         {deliveryPerformance?.on_time_rate_percent ?? 0}%
       </h3>
     </div>
+  </div>
+</section>
+
+<section className="maintenance-analytics-section">
+  <h2>Maintenance Analytics</h2>
+
+  <div className="maintenance-chart-card">
+    <ResponsiveContainer width="100%" height={350}>
+      <BarChart
+        data={[
+          {
+            priority: "High",
+            total_cost: 8790659.66
+          },
+          {
+            priority: "Medium",
+            total_cost: 9137636.23
+          },
+          {
+            priority: "Low",
+            total_cost: 8602673.89
+          }
+        ]}
+      >
+        <CartesianGrid strokeDasharray="3 3" />
+
+        <XAxis dataKey="priority" />
+
+        <YAxis
+  tickFormatter={(value) =>
+    `₹${(value / 100000).toFixed(0)}L`
+  }
+/>
+
+        <Tooltip
+          formatter={(value) =>
+            `₹${Number(value).toLocaleString("en-IN")}`
+          }
+        />
+
+        <Bar
+          dataKey="total_cost"
+          name="Maintenance Cost"
+        />
+      </BarChart>
+    </ResponsiveContainer>
   </div>
 </section>
         <section className="fleet-status-section">

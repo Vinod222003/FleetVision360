@@ -355,3 +355,14 @@ main h2 {
   padding: 24px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
+
+.maintenance-analytics-section {
+  margin-top: 40px;
+}
+
+.maintenance-chart-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}

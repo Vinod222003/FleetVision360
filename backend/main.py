@@ -372,3 +372,28 @@ def delivery_performance():
 
     finally:
         conn.close()
+
+@app.get("/api/maintenance/analytics")
+def maintenance_analytics():
+    conn = get_db()
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                priority,
+                COUNT(*) AS work_orders,
+                ROUND(SUM(cost), 2) AS total_cost,
+                ROUND(SUM(downtime_hours), 2) AS total_downtime_hours
+            FROM fact_maintenance
+            GROUP BY priority
+            ORDER BY total_cost DESC
+            """
+        ).fetchall()
+
+        return {
+            "maintenance_analytics": [dict(row) for row in rows]
+        }
+
+    finally:
+        conn.close()

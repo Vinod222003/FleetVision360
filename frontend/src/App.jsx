@@ -283,6 +283,43 @@ function App() {
     </div>
   </div>
 </section>
+
+<section className="fleet-map-section">
+  <h2>Live Fleet Map</h2>
+
+  <div className="fleet-map-card">
+    <MapContainer
+      center={[15.3173, 75.7139]}
+      zoom={6}
+      style={{ height: "500px", width: "100%" }}
+    >
+      <TileLayer
+        attribution='&copy; OpenStreetMap contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      {vehicles.map((vehicle) => (
+        <Marker
+          key={vehicle.vehicle_id}
+          position={[
+            vehicle.latitude,
+            vehicle.longitude
+          ]}
+        >
+          <Popup>
+            <strong>{vehicle.vehicle_id}</strong>
+            <br />
+            Type: {vehicle.type}
+            <br />
+            Model: {vehicle.model}
+            <br />
+            Speed: {vehicle.speed} km/h
+          </Popup>
+        </Marker>
+      ))}
+    </MapContainer>
+  </div>
+</section>
                 <section className="fleet-section">
           <h2>Live Fleet</h2>
 

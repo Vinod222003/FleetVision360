@@ -366,3 +366,15 @@ main h2 {
   padding: 24px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
+
+.fleet-map-section {
+  margin-top: 40px;
+}
+
+.fleet-map-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}

@@ -18,6 +18,7 @@ function App() {
   const [dashboard, setDashboard] = useState(null)
   const [vehicles, setVehicles] = useState([])
   const [silverGps, setSilverGps] = useState([])
+  const [fuelPrediction, setFuelPrediction] = useState(null)
   const [routes, setRoutes] = useState([])
   const [fuel, setFuel] = useState([])
   const [maintenance, setMaintenance] = useState([])
@@ -39,13 +40,13 @@ function App() {
 )
 
   useEffect(() => {
-  fetch("http://127.0.0.1:8002/api/dashboard")
+  fetch("http://127.0.0.1:8000/api/dashboard")
     .then((response) => response.json())
     .then((data) => setDashboard(data))
     .catch((error) => console.error("Dashboard API Error:", error))
 
   const fetchSilverGps = () => {
-    fetch("http://127.0.0.1:8002/api/silver/gps")
+    fetch("http://127.0.0.1:8000/api/silver/gps")
       .then((response) => response.json())
       .then((data) => {
         setSilverGps(data.gps)
@@ -54,50 +55,62 @@ function App() {
       .catch((error) => console.error("Silver GPS error:", error))
   }
 
+  fetch(
+  "http://127.0.0.1:8000/api/ml/fuel-prediction?distance_km=100&speed_kmh=60&fuel_level=70"
+)
+  .then((response) => response.json())
+  .then((data) => {
+    setFuelPrediction(data)
+    console.log("ML Fuel Prediction:", data)
+  })
+  .catch((error) =>
+    console.error("ML Fuel Prediction Error:", error)
+  )
+
   fetchSilverGps()
 
   const silverGpsInterval = setInterval(fetchSilverGps, 10000)
 
-  fetch("http://127.0.0.1:8002/api/fleet/live")
+  fetch("http://127.0.0.1:8000/api/fleet/live")
     .then((response) => response.json())
     .then((data) => setVehicles(data.vehicles))
     .catch((error) => console.error("Fleet API Error:", error))
 
-  fetch("http://127.0.0.1:8002/api/routes")
+  fetch("http://127.0.0.1:8000/api/routes")
     .then((response) => response.json())
     .then((data) => setRoutes(data.routes))
     .catch((error) => console.error("Routes API Error:", error))
 
-  fetch("http://127.0.0.1:8002/api/fuel")
+  fetch("http://127.0.0.1:8000/api/fuel")
     .then((response) => response.json())
     .then((data) => setFuel(data.fuel))
     .catch((error) => console.error("Fuel API Error:", error))
 
-  fetch("http://127.0.0.1:8002/api/fuel/analytics")
+  fetch("http://127.0.0.1:8000/api/fuel/analytics")
     .then((response) => response.json())
     .then((data) => setFuelAnalytics(data.fuel_analytics))
     .catch((error) =>
       console.error("Fuel Analytics API Error:", error)
     )
 
-  fetch("http://127.0.0.1:8002/api/maintenance/analytics")
+  fetch("http://127.0.0.1:8000/api/maintenance/analytics")
     .then((response) => response.json())
     .then((data) => setMaintenanceAnalytics(data.maintenance_analytics))
     .catch((error) =>
       console.error("Maintenance Analytics API Error:", error)
     )
 
-  fetch("http://127.0.0.1:8002/api/maintenance")
+  fetch("http://127.0.0.1:8000/api/maintenance")
     .then((response) => response.json())
     .then((data) => setMaintenance(data.maintenance))
     .catch((error) => console.error("Maintenance API Error:", error))
 
-  fetch("http://127.0.0.1:8002/api/fleet/status")
+  fetch("http://127.0.0.1:8000/api/fleet/status")
     .then((response) => response.json())
     .then((data) => setFleetStatus(data))
     .catch((error) => console.error("Fleet Status API Error:", error))
 
-  fetch("http://127.0.0.1:8002/api/delivery-performance")
+  fetch("http://127.0.0.1:8000/api/delivery-performance")
     .then((response) => response.json())
     .then((data) => setDeliveryPerformance(data))
     .catch((error) =>
@@ -330,25 +343,31 @@ function App() {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {latestSilverGps.map((vehicle) => (
-        <Marker
-          key={vehicle.vehicle_id}
-          position={[
-            vehicle.latitude,
-            vehicle.longitude
-          ]}
-        >
-          <Popup>
-            <strong>{vehicle.vehicle_id}</strong>
-            <br />
-            Type: {vehicle.type}
-            <br />
-            Model: {vehicle.model}
-            <br />
-            Speed: {vehicle.speed} km/h
-          </Popup>
-        </Marker>
-      ))}
+{latestSilverGps.map((gps) => {
+  const vehicleInfo = vehicles.find(
+    (v) => v.vehicle_id === gps.vehicle_id
+  )
+
+  return (
+    <Marker
+      key={gps.vehicle_id}
+      position={[
+        gps.latitude,
+        gps.longitude
+      ]}
+    >
+      <Popup>
+        <strong>{gps.vehicle_id}</strong>
+        <br />
+        Type: {vehicleInfo?.type ?? "N/A"}
+        <br />
+        Model: {vehicleInfo?.model ?? "N/A"}
+        <br />
+        Speed: {gps.speed} km/h
+      </Popup>
+    </Marker>
+  )
+})}
     </MapContainer>
   </div>
 </section>
@@ -574,6 +593,39 @@ function App() {
           ))}
         </tbody>
       </table>
+    </div>
+  </div>
+</section>
+
+<section className="ml-prediction-section">
+  <h2>ML Fuel Prediction</h2>
+
+  <div className="ml-prediction-card">
+    <div>
+      <p>Distance</p>
+      <h3>{fuelPrediction?.distance_km ?? 0} km</h3>
+    </div>
+
+    <div>
+      <p>Speed</p>
+      <h3>{fuelPrediction?.speed_kmh ?? 0} km/h</h3>
+    </div>
+
+    <div>
+      <p>Fuel Level</p>
+      <h3>{fuelPrediction?.fuel_level ?? 0}%</h3>
+    </div>
+
+    <div>
+      <p>Predicted Consumption</p>
+      <h3>
+        {fuelPrediction?.predicted_fuel_consumption ?? 0}
+      </h3>
+    </div>
+
+    <div>
+      <p>Model</p>
+      <h3>{fuelPrediction?.model ?? "Loading..."}</h3>
     </div>
   </div>
 </section>

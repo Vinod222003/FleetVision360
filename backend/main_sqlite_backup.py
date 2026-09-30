@@ -1,20 +1,8 @@
 from pathlib import Path
-import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from dotenv import load_dotenv
+import sqlite3
 import json
 import joblib
 import numpy as np
-import logging
-import time
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s"
-)
-
-logger = logging.getLogger("fleetvision360")
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,15 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_PATH = BASE_DIR / "ml" / "models" / "fuel_prediction_model.pkl"
 
 fuel_model = joblib.load(MODEL_PATH)
-load_dotenv(BASE_DIR / ".env")
-
-POSTGRES_CONFIG = {
-    "host": os.getenv("POSTGRES_HOST"),
-    "port": os.getenv("POSTGRES_PORT"),
-    "database": os.getenv("POSTGRES_DB"),
-    "user": os.getenv("POSTGRES_USER"),
-    "password": os.getenv("POSTGRES_PASSWORD"),
-}
+DB_PATH = BASE_DIR / "data" / "warehouse" / "fleetvision360.db"
 
 
 app = FastAPI(
@@ -40,24 +20,6 @@ app = FastAPI(
     description="Backend API for the FleetVision 360 fleet intelligence platform",
     version="1.0.0"
 )
-
-@app.middleware("http")
-async def log_requests(request, call_next):
-    start_time = time.time()
-
-    response = await call_next(request)
-
-    duration = round((time.time() - start_time) * 1000, 2)
-
-    logger.info(
-        "%s %s | status=%s | duration=%sms",
-        request.method,
-        request.url.path,
-        response.status_code,
-        duration
-    )
-
-    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -67,30 +29,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class PostgreSQLConnection:
-    def __init__(self):
-        self.conn = psycopg2.connect(
-            **POSTGRES_CONFIG
-        )
-
-    def execute(self, query, params=None):
-        cursor = self.conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute(query, params or ())
-        return cursor
-
-    def cursor(self):
-        return self.conn.cursor()
-    def close(self):
-        self.conn.close()
 
 def get_db():
-    try:
-        return PostgreSQLConnection()
-    except Exception as e:
+    if not DB_PATH.exists():
         raise HTTPException(
             status_code=500,
-            detail=f"PostgreSQL connection failed: {e}"
+            detail=f"Warehouse database not found: {DB_PATH}"
         )
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 @app.get("/")
@@ -103,28 +52,10 @@ def root():
 
 @app.get("/api/health")
 def health_check():
-    conn = None
-
-    try:
-        conn = get_db()
-
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1")
-
-        return {
-            "status": "healthy",
-            "database": True
-        }
-
-    except Exception:
-        return {
-            "status": "unhealthy",
-            "database": False
-        }
-
-    finally:
-        if conn:
-            conn.close()
+    return {
+        "status": "healthy",
+        "database": DB_PATH.exists()
+    }
 
 
 @app.get("/api/dashboard")
@@ -316,8 +247,8 @@ def fuel_analytics():
             """
             SELECT
                 fuel_type,
-                ROUND(SUM(liters)::numeric, 2) AS total_liters,
-		ROUND(SUM(amount)::numeric, 2) AS total_cost
+                ROUND(SUM(liters), 2) AS total_liters,
+                ROUND(SUM(amount), 2) AS total_cost
             FROM fact_fuel
             GROUP BY fuel_type
             ORDER BY total_cost DESC
@@ -369,14 +300,14 @@ def fleet_status():
     try:
         rows = conn.execute(
             """
-            SELECT speed
-	    FROM (
-		SELECT DISTINCT ON (vehicle_id)
-		    vehicle_id,
-                    speed
-    		FROM fact_gps
-    		ORDER BY vehicle_id, timestamp DESC
-            ) latest
+            SELECT
+                speed
+            FROM fact_gps g
+            WHERE g.timestamp = (
+                SELECT MAX(g2.timestamp)
+                FROM fact_gps g2
+                WHERE g2.vehicle_id = g.vehicle_id
+            )
             """
         ).fetchall()
 
@@ -458,8 +389,8 @@ def maintenance_analytics():
             SELECT
                 priority,
                 COUNT(*) AS work_orders,
-                ROUND(SUM(cost)::numeric, 2) AS total_cost,
-		ROUND(SUM(downtime_hours)::numeric, 2) AS total_downtime_hours
+                ROUND(SUM(cost), 2) AS total_cost,
+                ROUND(SUM(downtime_hours), 2) AS total_downtime_hours
             FROM fact_maintenance
             GROUP BY priority
             ORDER BY total_cost DESC
@@ -537,109 +468,3 @@ def fuel_prediction(
             status_code=500,
             detail=str(e)
         )
-@app.get("/api/data-quality")
-def data_quality():
-    conn = None
-
-    try:
-        conn = get_db()
-
-        checks = {}
-
-        with conn.cursor() as cur:
-
-            # Vehicle count
-            cur.execute("SELECT COUNT(*) FROM dim_vehicle")
-            checks["vehicle_count"] = cur.fetchone()[0]
-
-            # Null vehicle IDs
-            cur.execute("""
-                SELECT COUNT(*)
-                FROM dim_vehicle
-                WHERE vehicle_id IS NULL
-            """)
-            checks["null_vehicle_ids"] = cur.fetchone()[0]
-
-            # Duplicate vehicle IDs
-            cur.execute("""
-                SELECT COUNT(*)
-                FROM (
-                    SELECT vehicle_id
-                    FROM dim_vehicle
-                    GROUP BY vehicle_id
-                    HAVING COUNT(*) > 1
-                ) duplicates
-            """)
-            checks["duplicate_vehicle_ids"] = cur.fetchone()[0]
-
-            # Invalid GPS vehicle references
-            cur.execute("""
-                SELECT COUNT(*)
-                FROM fact_gps g
-                LEFT JOIN dim_vehicle v
-                    ON g.vehicle_id = v.vehicle_id
-                WHERE v.vehicle_id IS NULL
-            """)
-            checks["invalid_gps_vehicle_references"] = cur.fetchone()[0]
-
-            # Invalid GPS speeds
-            cur.execute("""
-                SELECT COUNT(*)
-                FROM fact_gps
-                WHERE speed < 0 OR speed > 200
-            """)
-            checks["invalid_gps_speed"] = cur.fetchone()[0]
-
-            # Delivery records
-            cur.execute("SELECT COUNT(*) FROM fact_delivery")
-            checks["delivery_count"] = cur.fetchone()[0]
-
-            # Fuel records
-            cur.execute("SELECT COUNT(*) FROM fact_fuel")
-            checks["fuel_count"] = cur.fetchone()[0]
-
-            # Maintenance records
-            cur.execute("SELECT COUNT(*) FROM fact_maintenance")
-            checks["maintenance_count"] = cur.fetchone()[0]
-
-        failed_checks = []
-
-        if checks["vehicle_count"] == 0:
-            failed_checks.append("vehicle_count")
-
-        if checks["null_vehicle_ids"] > 0:
-            failed_checks.append("null_vehicle_ids")
-
-        if checks["duplicate_vehicle_ids"] > 0:
-            failed_checks.append("duplicate_vehicle_ids")
-
-        if checks["invalid_gps_vehicle_references"] > 0:
-            failed_checks.append("invalid_gps_vehicle_references")
-
-        if checks["invalid_gps_speed"] > 0:
-            failed_checks.append("invalid_gps_speed")
-
-        if checks["delivery_count"] == 0:
-            failed_checks.append("delivery_count")
-
-        if checks["fuel_count"] == 0:
-            failed_checks.append("fuel_count")
-
-        if checks["maintenance_count"] == 0:
-            failed_checks.append("maintenance_count")
-
-        return {
-            "status": "healthy" if not failed_checks else "warning",
-            "checks": checks,
-            "failed_checks": failed_checks
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Data quality check failed: {e}"
-        )
-
-    finally:
-        if conn:
-            conn.close()

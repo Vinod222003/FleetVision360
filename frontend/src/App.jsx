@@ -17,6 +17,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 function App() {
   const [dashboard, setDashboard] = useState(null)
   const [vehicles, setVehicles] = useState([])
+  const [silverGps, setSilverGps] = useState([])
   const [routes, setRoutes] = useState([])
   const [fuel, setFuel] = useState([])
   const [maintenance, setMaintenance] = useState([])
@@ -24,6 +25,18 @@ function App() {
   const [deliveryPerformance, setDeliveryPerformance] = useState(null)
   const [fuelAnalytics, setFuelAnalytics] = useState([])
   const [maintenanceAnalytics, setMaintenanceAnalytics] = useState([])
+  const latestSilverGps = Object.values(
+  silverGps.reduce((latest, gps) => {
+    if (
+      !latest[gps.vehicle_id] ||
+      new Date(gps.timestamp) > new Date(latest[gps.vehicle_id].timestamp)
+    ) {
+      latest[gps.vehicle_id] = gps
+    }
+
+    return latest
+  }, {})
+)
 
   useEffect(() => {
   fetch("http://127.0.0.1:8002/api/dashboard")
@@ -31,50 +44,69 @@ function App() {
     .then((data) => setDashboard(data))
     .catch((error) => console.error("Dashboard API Error:", error))
 
+  const fetchSilverGps = () => {
+    fetch("http://127.0.0.1:8002/api/silver/gps")
+      .then((response) => response.json())
+      .then((data) => {
+        setSilverGps(data.gps)
+        console.log("Silver GPS records:", data.gps.length)
+      })
+      .catch((error) => console.error("Silver GPS error:", error))
+  }
+
+  fetchSilverGps()
+
+  const silverGpsInterval = setInterval(fetchSilverGps, 10000)
+
   fetch("http://127.0.0.1:8002/api/fleet/live")
     .then((response) => response.json())
     .then((data) => setVehicles(data.vehicles))
     .catch((error) => console.error("Fleet API Error:", error))
 
-   fetch("http://127.0.0.1:8002/api/routes")
-  .then((response) => response.json())
-  .then((data) => setRoutes(data.routes))
-  .catch((error) => console.error("Routes API Error:", error))
+  fetch("http://127.0.0.1:8002/api/routes")
+    .then((response) => response.json())
+    .then((data) => setRoutes(data.routes))
+    .catch((error) => console.error("Routes API Error:", error))
 
   fetch("http://127.0.0.1:8002/api/fuel")
-  .then((response) => response.json())
-  .then((data) => setFuel(data.fuel))
-  .catch((error) => console.error("Fuel API Error:", error))
+    .then((response) => response.json())
+    .then((data) => setFuel(data.fuel))
+    .catch((error) => console.error("Fuel API Error:", error))
 
   fetch("http://127.0.0.1:8002/api/fuel/analytics")
-  .then((response) => response.json())
-  .then((data) => setFuelAnalytics(data.fuel_analytics))
-  .catch((error) =>
-    console.error("Fuel Analytics API Error:", error)
-  )
+    .then((response) => response.json())
+    .then((data) => setFuelAnalytics(data.fuel_analytics))
+    .catch((error) =>
+      console.error("Fuel Analytics API Error:", error)
+    )
 
   fetch("http://127.0.0.1:8002/api/maintenance/analytics")
-  .then((response) => response.json())
-  .then((data) => setMaintenanceAnalytics(data.maintenance_analytics))
-  .catch((error) =>
-    console.error("Maintenance Analytics API Error:", error)
-  )
+    .then((response) => response.json())
+    .then((data) => setMaintenanceAnalytics(data.maintenance_analytics))
+    .catch((error) =>
+      console.error("Maintenance Analytics API Error:", error)
+    )
 
   fetch("http://127.0.0.1:8002/api/maintenance")
-  .then((response) => response.json())
-  .then((data) => setMaintenance(data.maintenance))
-  .catch((error) => console.error("Maintenance API Error:", error))
+    .then((response) => response.json())
+    .then((data) => setMaintenance(data.maintenance))
+    .catch((error) => console.error("Maintenance API Error:", error))
 
   fetch("http://127.0.0.1:8002/api/fleet/status")
-  .then((response) => response.json())
-  .then((data) => setFleetStatus(data))
-  .catch((error) => console.error("Fleet Status API Error:", error))
+    .then((response) => response.json())
+    .then((data) => setFleetStatus(data))
+    .catch((error) => console.error("Fleet Status API Error:", error))
 
   fetch("http://127.0.0.1:8002/api/delivery-performance")
-  .then((response) => response.json())
-  .then((data) => setDeliveryPerformance(data))
-  .catch((error) =>
-    console.error("Delivery Performance API Error:", error))
+    .then((response) => response.json())
+    .then((data) => setDeliveryPerformance(data))
+    .catch((error) =>
+      console.error("Delivery Performance API Error:", error)
+    )
+
+  return () => {
+    clearInterval(silverGpsInterval)
+  }
 }, [])
 
   if (!dashboard) {
@@ -298,7 +330,7 @@ function App() {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {vehicles.map((vehicle) => (
+      {latestSilverGps.map((vehicle) => (
         <Marker
           key={vehicle.vehicle_id}
           position={[
@@ -508,6 +540,41 @@ function App() {
         ))}
       </tbody>
     </table>
+  </div>
+</section>
+<section className="silver-gps-section">
+  <h2>Silver GPS Data</h2>
+
+  <div className="silver-gps-card">
+    <p>
+      GPS records processed by PySpark: <strong>{silverGps.length}</strong>
+    </p>
+
+    <div className="silver-gps-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Vehicle ID</th>
+            <th>Timestamp</th>
+            <th>Latitude</th>
+            <th>Longitude</th>
+            <th>Speed (km/h)</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {silverGps.slice(0, 10).map((gps, index) => (
+            <tr key={`${gps.vehicle_id}-${gps.timestamp}-${index}`}>
+              <td>{gps.vehicle_id}</td>
+              <td>{gps.timestamp}</td>
+              <td>{gps.latitude}</td>
+              <td>{gps.longitude}</td>
+              <td>{gps.speed}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   </div>
 </section>
       </main>

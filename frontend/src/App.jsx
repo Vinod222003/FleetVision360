@@ -40,13 +40,13 @@ function App() {
 )
 
   useEffect(() => {
-  fetch("http://127.0.0.1:8000/api/dashboard")
+  fetch(`${import.meta.env.VITE_API_URL}/api/dashboard`)
     .then((response) => response.json())
     .then((data) => setDashboard(data))
     .catch((error) => console.error("Dashboard API Error:", error))
 
   const fetchSilverGps = () => {
-    fetch("http://127.0.0.1:8000/api/silver/gps")
+    fetch(`${import.meta.env.VITE_API_URL}/api/silver/gps`)
       .then((response) => response.json())
       .then((data) => {
         setSilverGps(data.gps)
@@ -56,7 +56,7 @@ function App() {
   }
 
   fetch(
-  "http://127.0.0.1:8000/api/ml/fuel-prediction?distance_km=100&speed_kmh=60&fuel_level=70"
+  `${import.meta.env.VITE_API_URL}/api/ml/fuel-prediction?distance_km=100&speed_kmh=60&fuel_level=70`
 )
   .then((response) => response.json())
   .then((data) => {
@@ -71,46 +71,46 @@ function App() {
 
   const silverGpsInterval = setInterval(fetchSilverGps, 10000)
 
-  fetch("http://127.0.0.1:8000/api/fleet/live")
+  fetch(`${import.meta.env.VITE_API_URL}/api/fleet/live`)
     .then((response) => response.json())
     .then((data) => setVehicles(data.vehicles))
     .catch((error) => console.error("Fleet API Error:", error))
 
-  fetch("http://127.0.0.1:8000/api/routes")
+  fetch(`${import.meta.env.VITE_API_URL}/api/routes`)
     .then((response) => response.json())
     .then((data) => setRoutes(data.routes))
     .catch((error) => console.error("Routes API Error:", error))
 
-  fetch("http://127.0.0.1:8000/api/fuel")
+  fetch(`${import.meta.env.VITE_API_URL}/api/fuel`)
     .then((response) => response.json())
     .then((data) => setFuel(data.fuel))
     .catch((error) => console.error("Fuel API Error:", error))
 
-  fetch("http://127.0.0.1:8000/api/fuel/analytics")
+  fetch(`${import.meta.env.VITE_API_URL}/api/fuel/analytics`)
     .then((response) => response.json())
     .then((data) => setFuelAnalytics(data.fuel_analytics))
     .catch((error) =>
       console.error("Fuel Analytics API Error:", error)
     )
 
-  fetch("http://127.0.0.1:8000/api/maintenance/analytics")
+  fetch(`${import.meta.env.VITE_API_URL}/api/maintenance/analytics`)
     .then((response) => response.json())
     .then((data) => setMaintenanceAnalytics(data.maintenance_analytics))
     .catch((error) =>
       console.error("Maintenance Analytics API Error:", error)
     )
 
-  fetch("http://127.0.0.1:8000/api/maintenance")
+  fetch(`${import.meta.env.VITE_API_URL}/api/maintenance`)
     .then((response) => response.json())
     .then((data) => setMaintenance(data.maintenance))
     .catch((error) => console.error("Maintenance API Error:", error))
 
-  fetch("http://127.0.0.1:8000/api/fleet/status")
+  fetch(`${import.meta.env.VITE_API_URL}/api/fleet/status`)
     .then((response) => response.json())
     .then((data) => setFleetStatus(data))
     .catch((error) => console.error("Fleet Status API Error:", error))
 
-  fetch("http://127.0.0.1:8000/api/delivery-performance")
+  fetch(`${import.meta.env.VITE_API_URL}/api/delivery-performance`)
     .then((response) => response.json())
     .then((data) => setDeliveryPerformance(data))
     .catch((error) =>
@@ -636,3 +636,4 @@ function App() {
 }
 
 export default App
+

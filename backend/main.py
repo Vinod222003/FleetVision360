@@ -1,5 +1,6 @@
 from pathlib import Path
 import sqlite3
+import json
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -397,3 +398,39 @@ def maintenance_analytics():
 
     finally:
         conn.close()
+
+@app.get("/api/silver/gps")
+def silver_gps():
+    silver_file = (
+        BASE_DIR
+        / "data"
+        / "silver"
+        / "gps"
+        / "gps_data.jsonl"
+    )
+
+    if not silver_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Silver GPS file not found: {silver_file}"
+        )
+
+    records = []
+
+    try:
+        with open(silver_file, "r", encoding="utf-8") as file:
+            for line in file:
+                if line.strip():
+                    records.append(json.loads(line))
+
+        return {
+            "count": len(records),
+            "source": "PySpark Silver GPS",
+            "gps": records
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )

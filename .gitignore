@@ -31,3 +31,4 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+data/silver/gps/gps_data.jsonl

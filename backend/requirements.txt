@@ -1,0 +1,7 @@
+fastapi==0.141.1
+uvicorn==0.54.0
+psycopg2-binary==2.9.13
+python-dotenv==1.2.3
+joblib==1.6.0
+numpy==2.3.5
+scikit-learn==1.9.1

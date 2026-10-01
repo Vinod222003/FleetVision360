@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import {
   BarChart,
   Bar,
@@ -6,15 +6,22 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  Legend
 } from "recharts"
 
 import "./App.css"
 import "leaflet/dist/leaflet.css"
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 
-
 function App() {
+  const API = import.meta.env.VITE_API_URL
+
   const [dashboard, setDashboard] = useState(null)
   const [vehicles, setVehicles] = useState([])
   const [silverGps, setSilverGps] = useState([])
@@ -26,104 +33,117 @@ function App() {
   const [deliveryPerformance, setDeliveryPerformance] = useState(null)
   const [fuelAnalytics, setFuelAnalytics] = useState([])
   const [maintenanceAnalytics, setMaintenanceAnalytics] = useState([])
-  const latestSilverGps = Object.values(
-  silverGps.reduce((latest, gps) => {
-    if (
-      !latest[gps.vehicle_id] ||
-      new Date(gps.timestamp) > new Date(latest[gps.vehicle_id].timestamp)
-    ) {
-      latest[gps.vehicle_id] = gps
-    }
+  const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [loading, setLoading] = useState(false)
 
-    return latest
-  }, {})
-)
+  const [vehicleFilter, setVehicleFilter] = useState("All")
+  const [routeFilter, setRouteFilter] = useState("All")
+  const [statusFilter, setStatusFilter] = useState("All")
+
+  const loadData = async () => {
+    setLoading(true)
+
+    try {
+      const requests = await Promise.all([
+        fetch(`${API}/api/dashboard`).then(r => r.json()),
+        fetch(`${API}/api/silver/gps`).then(r => r.json()),
+        fetch(`${API}/api/ml/fuel-prediction?distance_km=100&speed_kmh=60&fuel_level=70`).then(r => r.json()),
+        fetch(`${API}/api/fleet/live`).then(r => r.json()),
+        fetch(`${API}/api/routes`).then(r => r.json()),
+        fetch(`${API}/api/fuel`).then(r => r.json()),
+        fetch(`${API}/api/fuel/analytics`).then(r => r.json()),
+        fetch(`${API}/api/maintenance/analytics`).then(r => r.json()),
+        fetch(`${API}/api/maintenance`).then(r => r.json()),
+        fetch(`${API}/api/fleet/status`).then(r => r.json()),
+        fetch(`${API}/api/delivery-performance`).then(r => r.json())
+      ])
+
+      setDashboard(requests[0])
+      setSilverGps(requests[1].gps || [])
+      setFuelPrediction(requests[2])
+      setVehicles(requests[3].vehicles || [])
+      setRoutes(requests[4].routes || [])
+      setFuel(requests[5].fuel || [])
+      setFuelAnalytics(requests[6].fuel_analytics || [])
+      setMaintenanceAnalytics(requests[7].maintenance_analytics || [])
+      setMaintenance(requests[8].maintenance || [])
+      setFleetStatus(requests[9])
+      setDeliveryPerformance(requests[10])
+      setLastRefresh(new Date())
+    } catch (error) {
+      console.error("Dashboard refresh error:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-  fetch(`${import.meta.env.VITE_API_URL}/api/dashboard`)
-    .then((response) => response.json())
-    .then((data) => setDashboard(data))
-    .catch((error) => console.error("Dashboard API Error:", error))
+    loadData()
 
-  const fetchSilverGps = () => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/silver/gps`)
-      .then((response) => response.json())
-      .then((data) => {
-        setSilverGps(data.gps)
-        console.log("Silver GPS records:", data.gps.length)
-      })
-      .catch((error) => console.error("Silver GPS error:", error))
-  }
+    const interval = setInterval(() => {
+      fetch(`${API}/api/silver/gps`)
+        .then(r => r.json())
+        .then(data => setSilverGps(data.gps || []))
+        .catch(error => console.error("GPS refresh error:", error))
+    }, 10000)
 
-  fetch(
-  `${import.meta.env.VITE_API_URL}/api/ml/fuel-prediction?distance_km=100&speed_kmh=60&fuel_level=70`
-)
-  .then((response) => response.json())
-  .then((data) => {
-    setFuelPrediction(data)
-    console.log("ML Fuel Prediction:", data)
-  })
-  .catch((error) =>
-    console.error("ML Fuel Prediction Error:", error)
+    return () => clearInterval(interval)
+  }, [])
+
+  const latestSilverGps = Object.values(
+    silverGps.reduce((latest, gps) => {
+      if (
+        !latest[gps.vehicle_id] ||
+        new Date(gps.timestamp) > new Date(latest[gps.vehicle_id].timestamp)
+      ) {
+        latest[gps.vehicle_id] = gps
+      }
+      return latest
+    }, {})
   )
 
-  fetchSilverGps()
-
-  const silverGpsInterval = setInterval(fetchSilverGps, 10000)
-
-  fetch(`${import.meta.env.VITE_API_URL}/api/fleet/live`)
-    .then((response) => response.json())
-    .then((data) => setVehicles(data.vehicles))
-    .catch((error) => console.error("Fleet API Error:", error))
-
-  fetch(`${import.meta.env.VITE_API_URL}/api/routes`)
-    .then((response) => response.json())
-    .then((data) => setRoutes(data.routes))
-    .catch((error) => console.error("Routes API Error:", error))
-
-  fetch(`${import.meta.env.VITE_API_URL}/api/fuel`)
-    .then((response) => response.json())
-    .then((data) => setFuel(data.fuel))
-    .catch((error) => console.error("Fuel API Error:", error))
-
-  fetch(`${import.meta.env.VITE_API_URL}/api/fuel/analytics`)
-    .then((response) => response.json())
-    .then((data) => setFuelAnalytics(data.fuel_analytics))
-    .catch((error) =>
-      console.error("Fuel Analytics API Error:", error)
-    )
-
-  fetch(`${import.meta.env.VITE_API_URL}/api/maintenance/analytics`)
-    .then((response) => response.json())
-    .then((data) => setMaintenanceAnalytics(data.maintenance_analytics))
-    .catch((error) =>
-      console.error("Maintenance Analytics API Error:", error)
-    )
-
-  fetch(`${import.meta.env.VITE_API_URL}/api/maintenance`)
-    .then((response) => response.json())
-    .then((data) => setMaintenance(data.maintenance))
-    .catch((error) => console.error("Maintenance API Error:", error))
-
-  fetch(`${import.meta.env.VITE_API_URL}/api/fleet/status`)
-    .then((response) => response.json())
-    .then((data) => setFleetStatus(data))
-    .catch((error) => console.error("Fleet Status API Error:", error))
-
-  fetch(`${import.meta.env.VITE_API_URL}/api/delivery-performance`)
-    .then((response) => response.json())
-    .then((data) => setDeliveryPerformance(data))
-    .catch((error) =>
-      console.error("Delivery Performance API Error:", error)
-    )
-
-  return () => {
-    clearInterval(silverGpsInterval)
+  const getVehicleStatus = (speed) => {
+    const value = Number(speed) || 0
+    if (value > 5) return "Moving"
+    if (value > 0) return "Idle"
+    return "Stopped"
   }
-}, [])
+
+  const filteredVehicles = useMemo(() => {
+    return vehicles.filter(vehicle => {
+      const vehicleMatch =
+        vehicleFilter === "All" || vehicle.vehicle_id === vehicleFilter
+
+      const statusMatch =
+        statusFilter === "All" ||
+        getVehicleStatus(vehicle.speed) === statusFilter
+
+      return vehicleMatch && statusMatch
+    })
+  }, [vehicles, vehicleFilter, statusFilter])
+
+  const filteredRoutes = useMemo(() => {
+    if (routeFilter === "All") return routes
+    return routes.filter(route => route.route_id === routeFilter)
+  }, [routes, routeFilter])
+
+  const fleetStatusChart = [
+    { name: "Moving", value: fleetStatus?.moving ?? 0 },
+    { name: "Idle", value: fleetStatus?.idle ?? 0 },
+    { name: "Stopped", value: fleetStatus?.stopped ?? 0 }
+  ]
+
+  const maintenanceChart =
+    maintenanceAnalytics.length > 0
+      ? maintenanceAnalytics
+      : [
+          { priority: "High", total_cost: 0 },
+          { priority: "Medium", total_cost: 0 },
+          { priority: "Low", total_cost: 0 }
+        ]
 
   if (!dashboard) {
-    return <h2 className="loading">Loading FleetVision 360...</h2>
+    return <div className="loading">Loading FleetVision 360...</div>
   }
 
   return (
@@ -132,22 +152,84 @@ function App() {
       <header className="header">
         <div>
           <h1>FleetVision 360</h1>
-          <p>Fleet Intelligence Dashboard</p>
+          <p>Fleet Intelligence & Operations Command Center</p>
         </div>
 
-        <div className="status">
-          <span></span> System Online
+        <div className="header-right">
+          <div className="status">
+            <span></span>
+            System Online
+          </div>
+
+          <button className="refresh-btn" onClick={loadData}>
+            {loading ? "Refreshing..." : "Refresh Data"}
+          </button>
         </div>
       </header>
 
       <main>
 
-        <h2>Dashboard Overview</h2>
+        <section className="control-panel">
+          <div>
+            <label>Vehicle</label>
+            <select
+              value={vehicleFilter}
+              onChange={e => setVehicleFilter(e.target.value)}
+            >
+              <option value="All">All Vehicles</option>
+              {vehicles.map(vehicle => (
+                <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>
+                  {vehicle.vehicle_id}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div className="cards">
+          <div>
+            <label>Route</label>
+            <select
+              value={routeFilter}
+              onChange={e => setRouteFilter(e.target.value)}
+            >
+              <option value="All">All Routes</option>
+              {routes.map(route => (
+                <option key={route.route_id} value={route.route_id}>
+                  {route.route_id}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label>Status</label>
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+            >
+              <option value="All">All Status</option>
+              <option value="Moving">Moving</option>
+              <option value="Idle">Idle</option>
+              <option value="Stopped">Stopped</option>
+            </select>
+          </div>
+
+          <div className="refresh-info">
+            Last refresh:
+            <strong>{lastRefresh.toLocaleTimeString()}</strong>
+          </div>
+        </section>
+
+        <section className="page-title">
+          <div>
+            <h2>Executive Overview</h2>
+            <p>Real-time fleet performance and operational intelligence</p>
+          </div>
+        </section>
+
+        <section className="cards">
 
           <div className="card">
-            <div className="icon">🚚</div>
+            <div className="icon">TR</div>
             <div>
               <p>Vehicles</p>
               <h3>{dashboard.vehicles}</h3>
@@ -155,7 +237,7 @@ function App() {
           </div>
 
           <div className="card">
-            <div className="icon">👨‍✈️</div>
+            <div className="icon">DR</div>
             <div>
               <p>Drivers</p>
               <h3>{dashboard.drivers}</h3>
@@ -163,7 +245,7 @@ function App() {
           </div>
 
           <div className="card">
-            <div className="icon">🛣️</div>
+            <div className="icon">RT</div>
             <div>
               <p>Routes</p>
               <h3>{dashboard.routes}</h3>
@@ -171,7 +253,7 @@ function App() {
           </div>
 
           <div className="card">
-            <div className="icon">📦</div>
+            <div className="icon">DL</div>
             <div>
               <p>Deliveries</p>
               <h3>{dashboard.deliveries.toLocaleString()}</h3>
@@ -179,7 +261,7 @@ function App() {
           </div>
 
           <div className="card">
-            <div className="icon">⏱️</div>
+            <div className="icon">OT</div>
             <div>
               <p>On-Time Delivery</p>
               <h3>{dashboard.on_time_delivery_rate_percent}%</h3>
@@ -187,198 +269,221 @@ function App() {
           </div>
 
           <div className="card">
-            <div className="icon">⛽</div>
+            <div className="icon">FC</div>
             <div>
               <p>Fuel Cost</p>
-              <h3>₹{dashboard.fuel_cost.toLocaleString()}</h3>
+              <h3>₹{Number(dashboard.fuel_cost).toLocaleString("en-IN")}</h3>
             </div>
           </div>
 
           <div className="card">
-            <div className="icon">🔧</div>
+            <div className="icon">MT</div>
             <div>
               <p>Maintenance Orders</p>
               <h3>{dashboard.maintenance_work_orders}</h3>
             </div>
           </div>
 
-        </div>
-        <section className="fuel-analytics-section">
-  <h2>Fuel Analytics</h2>
+        </section>
 
-  <div className="fuel-chart-card">
-    <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={fuelAnalytics}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="fuel_type" />
-        <YAxis />
-        <Tooltip />
-        <Bar dataKey="total_liters" name="Fuel Liters" />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-</section>
-        <section className="delivery-performance-section">
-  <h2>Delivery Performance</h2>
+        <section className="analytics-grid">
 
-  <div className="delivery-performance-card">
-    <div>
-      <p>Total Completed Deliveries</p>
-      <h3>{deliveryPerformance?.total_deliveries ?? 0}</h3>
-    </div>
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>Fleet Status</h2>
+                <p>Current vehicle operating state</p>
+              </div>
+            </div>
 
-    <div>
-      <p>Delivered</p>
-      <h3>{deliveryPerformance?.delivered ?? 0}</h3>
-    </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={fleetStatusChart}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  innerRadius={55}
+                  label
+                >
+                  {fleetStatusChart.map((entry, index) => (
+                    <Cell key={index} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
 
-    <div>
-      <p>Delayed</p>
-      <h3>{deliveryPerformance?.delayed ?? 0}</h3>
-    </div>
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>Delivery Performance</h2>
+                <p>Completed delivery monitoring</p>
+              </div>
+            </div>
 
-    <div>
-      <p>Delivery Performance</p>
-      <h3>
-        {deliveryPerformance?.on_time_rate_percent ?? 0}%
-      </h3>
-    </div>
-  </div>
-</section>
+            <div className="performance-grid">
+              <div>
+                <span>Total</span>
+                <strong>{deliveryPerformance?.total_deliveries ?? 0}</strong>
+              </div>
 
-<section className="maintenance-analytics-section">
-  <h2>Maintenance Analytics</h2>
+              <div>
+                <span>Delivered</span>
+                <strong>{deliveryPerformance?.delivered ?? 0}</strong>
+              </div>
 
-  <div className="maintenance-chart-card">
-    <ResponsiveContainer width="100%" height={350}>
-      <BarChart
-        data={[
-          {
-            priority: "High",
-            total_cost: 8790659.66
-          },
-          {
-            priority: "Medium",
-            total_cost: 9137636.23
-          },
-          {
-            priority: "Low",
-            total_cost: 8602673.89
-          }
-        ]}
-      >
-        <CartesianGrid strokeDasharray="3 3" />
+              <div>
+                <span>Delayed</span>
+                <strong>{deliveryPerformance?.delayed ?? 0}</strong>
+              </div>
 
-        <XAxis dataKey="priority" />
+              <div>
+                <span>Performance</span>
+                <strong>
+                  {deliveryPerformance?.on_time_rate_percent ?? 0}%
+                </strong>
+              </div>
+            </div>
 
-        <YAxis
-  tickFormatter={(value) =>
-    `₹${(value / 100000).toFixed(0)}L`
-  }
-/>
+            <ResponsiveContainer width="100%" height={190}>
+              <BarChart
+                data={[
+                  {
+                    name: "Deliveries",
+                    Delivered: deliveryPerformance?.delivered ?? 0,
+                    Delayed: deliveryPerformance?.delayed ?? 0
+                  }
+                ]}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="Delivered" />
+                <Bar dataKey="Delayed" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-        <Tooltip
-          formatter={(value) =>
-            `₹${Number(value).toLocaleString("en-IN")}`
-          }
-        />
+        </section>
 
-        <Bar
-          dataKey="total_cost"
-          name="Maintenance Cost"
-        />
-      </BarChart>
-    </ResponsiveContainer>
-  </div>
-</section>
-        <section className="fleet-status-section">
-  <h2>Fleet Status</h2>
+        <section className="analytics-grid">
 
-  <div className="status-cards">
-    <div className="status-card">
-      <span>🟢</span>
-      <div>
-        <p>Moving</p>
-        <h3>{fleetStatus?.moving ?? 0}</h3>
-      </div>
-    </div>
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>Fuel Analytics</h2>
+                <p>Consumption by fuel type</p>
+              </div>
+            </div>
 
-    <div className="status-card">
-      <span>🟡</span>
-      <div>
-        <p>Idle</p>
-        <h3>{fleetStatus?.idle ?? 0}</h3>
-      </div>
-    </div>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={fuelAnalytics}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="fuel_type" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="total_liters" name="Fuel Liters" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-    <div className="status-card">
-      <span>🔴</span>
-      <div>
-        <p>Stopped</p>
-        <h3>{fleetStatus?.stopped ?? 0}</h3>
-      </div>
-    </div>
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>Maintenance Cost</h2>
+                <p>Maintenance expenditure by priority</p>
+              </div>
+            </div>
 
-    <div className="status-card">
-      <span>🚚</span>
-      <div>
-        <p>Total Vehicles</p>
-        <h3>{fleetStatus?.total ?? 0}</h3>
-      </div>
-    </div>
-  </div>
-</section>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={maintenanceChart}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="priority" />
+                <YAxis
+                  tickFormatter={value =>
+                    `₹${(value / 100000).toFixed(0)}L`
+                  }
+                />
+                <Tooltip
+                  formatter={value =>
+                    `₹${Number(value).toLocaleString("en-IN")}`
+                  }
+                />
+                <Legend />
+                <Bar dataKey="total_cost" name="Maintenance Cost" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-<section className="fleet-map-section">
-  <h2>Live Fleet Map</h2>
+        </section>
 
-  <div className="fleet-map-card">
-    <MapContainer
-      center={[15.3173, 75.7139]}
-      zoom={6}
-      style={{ height: "500px", width: "100%" }}
-    >
-      <TileLayer
-        attribution='&copy; OpenStreetMap contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+        <section className="panel full-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Live Fleet Map</h2>
+              <p>Latest GPS position processed through the Silver layer</p>
+            </div>
+            <span className="live-badge">LIVE</span>
+          </div>
 
-{latestSilverGps.map((gps) => {
-  const vehicleInfo = vehicles.find(
-    (v) => v.vehicle_id === gps.vehicle_id
-  )
+          <MapContainer
+            center={[15.3173, 75.7139]}
+            zoom={6}
+            style={{ height: "500px", width: "100%" }}
+          >
+            <TileLayer
+              attribution="&copy; OpenStreetMap contributors"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
 
-  return (
-    <Marker
-      key={gps.vehicle_id}
-      position={[
-        gps.latitude,
-        gps.longitude
-      ]}
-    >
-      <Popup>
-        <strong>{gps.vehicle_id}</strong>
-        <br />
-        Type: {vehicleInfo?.type ?? "N/A"}
-        <br />
-        Model: {vehicleInfo?.model ?? "N/A"}
-        <br />
-        Speed: {gps.speed} km/h
-      </Popup>
-    </Marker>
-  )
-})}
-    </MapContainer>
-  </div>
-</section>
-                <section className="fleet-section">
-          <h2>Live Fleet</h2>
+            {latestSilverGps.map(gps => {
+              const vehicleInfo = vehicles.find(
+                v => v.vehicle_id === gps.vehicle_id
+              )
 
-          <div className="fleet-table-container">
-            <table className="fleet-table">
+              return (
+                <Marker
+                  key={gps.vehicle_id}
+                  position={[gps.latitude, gps.longitude]}
+                >
+                  <Popup>
+                    <strong>{gps.vehicle_id}</strong>
+                    <br />
+                    Type: {vehicleInfo?.type ?? "N/A"}
+                    <br />
+                    Model: {vehicleInfo?.model ?? "N/A"}
+                    <br />
+                    Speed: {gps.speed} km/h
+                    <br />
+                    Status: {getVehicleStatus(gps.speed)}
+                  </Popup>
+                </Marker>
+              )
+            })}
+          </MapContainer>
+        </section>
+
+        <section className="panel full-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Fleet Operations</h2>
+              <p>{filteredVehicles.length} vehicles shown</p>
+            </div>
+          </div>
+
+          <div className="table-container">
+            <table>
               <thead>
                 <tr>
-                  <th>Vehicle ID</th>
+                  <th>Vehicle</th>
                   <th>Type</th>
                   <th>Model</th>
                   <th>Depot</th>
@@ -386,108 +491,169 @@ function App() {
                   <th>Status</th>
                   <th>Latitude</th>
                   <th>Longitude</th>
-                  <th>Last Update</th>
                 </tr>
               </thead>
 
               <tbody>
-                {vehicles.map((vehicle) => (
+                {filteredVehicles.slice(0, 30).map(vehicle => (
                   <tr key={vehicle.vehicle_id}>
-                    <td>{vehicle.vehicle_id}</td>
+                    <td><strong>{vehicle.vehicle_id}</strong></td>
                     <td>{vehicle.type}</td>
                     <td>{vehicle.model}</td>
                     <td>{vehicle.depot_id}</td>
                     <td>{vehicle.speed} km/h</td>
                     <td>
-                     {Number(vehicle.speed) > 5
-                        ? "Moving"
-                        : Number(vehicle.speed) > 0
-                         ? "Idle"
-                          : "Stopped"}
+                      <span className={`status-pill ${getVehicleStatus(vehicle.speed).toLowerCase()}`}>
+                        {getVehicleStatus(vehicle.speed)}
+                      </span>
                     </td>
                     <td>{vehicle.latitude}</td>
                     <td>{vehicle.longitude}</td>
-                    <td>{vehicle.timestamp}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </section>
-                <section className="map-section">
-          <h2>Fleet Map</h2>
 
-          <MapContainer
-            center={[20.5937, 78.9629]}
-            zoom={5}
-            className="fleet-map"
-          >
-            <TileLayer
-              attribution='&copy; OpenStreetMap contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
+        <section className="analytics-grid">
 
-            {vehicles.map((vehicle) => {
-  const speed = Number(vehicle.speed) || 0
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>Routes</h2>
+                <p>Route network overview</p>
+              </div>
+            </div>
 
-  let status = "Stopped"
+            <div className="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Route</th>
+                    <th>Origin</th>
+                    <th>Destination</th>
+                    <th>Distance</th>
+                    <th>Duration</th>
+                  </tr>
+                </thead>
 
-  if (speed > 5) {
-    status = "Moving"
-  } else if (speed > 0) {
-    status = "Idle"
-  }
+                <tbody>
+                  {filteredRoutes.slice(0, 12).map(route => (
+                    <tr key={route.route_key}>
+                      <td><strong>{route.route_id}</strong></td>
+                      <td>{route.origin}</td>
+                      <td>{route.destination}</td>
+                      <td>{route.distance_km} km</td>
+                      <td>{route.expected_duration_min} min</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-  return (
-    <Marker
-                key={vehicle.vehicle_id}
-                position={[
-                  vehicle.latitude,
-                  vehicle.longitude
-                ]}
-              >
-                <Popup>
-                  <strong>{vehicle.vehicle_id}</strong>
-                  <br />
-                  Type: {vehicle.type}
-                  <br />
-                  Model: {vehicle.model}
-                  <br />
-                  Speed: {vehicle.speed} km/h
-                  <br />
-                  Status: {status}
-                  <br />
-                  Depot: {vehicle.depot_id}
-                </Popup>
-              </Marker>
-               )
-            })}
-          </MapContainer>
+          <div className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>ML Fuel Prediction</h2>
+                <p>Machine-learning consumption estimate</p>
+              </div>
+              <span className="ml-badge">ML</span>
+            </div>
+
+            <div className="ml-grid">
+              <div>
+                <span>Distance</span>
+                <strong>{fuelPrediction?.distance_km ?? 0} km</strong>
+              </div>
+
+              <div>
+                <span>Speed</span>
+                <strong>{fuelPrediction?.speed_kmh ?? 0} km/h</strong>
+              </div>
+
+              <div>
+                <span>Fuel Level</span>
+                <strong>{fuelPrediction?.fuel_level ?? 0}%</strong>
+              </div>
+
+              <div>
+                <span>Predicted Consumption</span>
+                <strong>
+                  {fuelPrediction?.predicted_fuel_consumption ?? 0}
+                </strong>
+              </div>
+            </div>
+
+            <div className="model-name">
+              Model: {fuelPrediction?.model ?? "Loading..."}
+            </div>
+          </div>
+
         </section>
 
-                <section className="routes-section">
-          <h2>Routes</h2>
+        <section className="panel full-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Operational Alerts</h2>
+              <p>Exceptions requiring attention</p>
+            </div>
+          </div>
 
-          <div className="routes-table-container">
-            <table className="routes-table">
+          <div className="alerts-grid">
+            <div className="alert-card">
+              <strong>{fleetStatus?.stopped ?? 0}</strong>
+              <span>Stopped Vehicles</span>
+            </div>
+
+            <div className="alert-card">
+              <strong>{fleetStatus?.idle ?? 0}</strong>
+              <span>Idle Vehicles</span>
+            </div>
+
+            <div className="alert-card">
+              <strong>{deliveryPerformance?.delayed ?? 0}</strong>
+              <span>Delayed Deliveries</span>
+            </div>
+
+            <div className="alert-card">
+              <strong>{maintenance.length}</strong>
+              <span>Maintenance Orders</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="panel full-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Fuel Records</h2>
+              <p>Recent fuel transactions</p>
+            </div>
+          </div>
+
+          <div className="table-container">
+            <table>
               <thead>
                 <tr>
-                  <th>Route ID</th>
-                  <th>Origin</th>
-                  <th>Destination</th>
-                  <th>Distance</th>
-                  <th>Expected Duration</th>
+                  <th>Vehicle</th>
+                  <th>Timestamp</th>
+                  <th>Fuel Type</th>
+                  <th>Liters</th>
+                  <th>Amount</th>
+                  <th>Odometer</th>
                 </tr>
               </thead>
 
               <tbody>
-                {routes.map((route) => (
-                  <tr key={route.route_key}>
-                    <td>{route.route_id}</td>
-                    <td>{route.origin}</td>
-                    <td>{route.destination}</td>
-                    <td>{route.distance_km} km</td>
-                    <td>{route.expected_duration_min} min</td>
+                {fuel.slice(0, 15).map(record => (
+                  <tr key={record.fuel_key}>
+                    <td>{record.vehicle_id}</td>
+                    <td>{record.timestamp}</td>
+                    <td>{record.fuel_type}</td>
+                    <td>{record.liters} L</td>
+                    <td>₹{Number(record.amount).toLocaleString("en-IN")}</td>
+                    <td>{record.odometer_km} km</td>
                   </tr>
                 ))}
               </tbody>
@@ -495,145 +661,89 @@ function App() {
           </div>
         </section>
 
-        <section className="fuel-section">
-  <h2>Fuel Records</h2>
+        <section className="panel full-panel">
+          <div className="panel-header">
+            <div>
+              <h2>Maintenance Records</h2>
+              <p>Recent maintenance activity</p>
+            </div>
+          </div>
 
-  <div className="fuel-table-container">
-    <table className="fuel-table">
-      <thead>
-        <tr>
-          <th>Vehicle ID</th>
-          <th>Timestamp</th>
-          <th>Fuel Type</th>
-          <th>Liters</th>
-          <th>Amount</th>
-          <th>Odometer</th>
-        </tr>
-      </thead>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Work Order</th>
+                  <th>Vehicle</th>
+                  <th>Issue</th>
+                  <th>Priority</th>
+                  <th>Cost</th>
+                  <th>Downtime</th>
+                </tr>
+              </thead>
 
-      <tbody>
-        {fuel.map((record) => (
-          <tr key={record.fuel_key}>
-            <td>{record.vehicle_id}</td>
-            <td>{record.timestamp}</td>
-            <td>{record.fuel_type}</td>
-            <td>{record.liters} L</td>
-            <td>₹{record.amount}</td>
-            <td>{record.odometer_km} km</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</section>
-<section className="maintenance-section">
-  <h2>Maintenance Records</h2>
+              <tbody>
+                {maintenance.slice(0, 15).map(record => (
+                  <tr key={record.maintenance_key}>
+                    <td>{record.work_order_id}</td>
+                    <td>{record.vehicle_id}</td>
+                    <td>{record.issue}</td>
+                    <td>{record.priority}</td>
+                    <td>₹{Number(record.cost).toLocaleString("en-IN")}</td>
+                    <td>{record.downtime_hours} hrs</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-  <div className="maintenance-table-container">
-    <table className="maintenance-table">
-      <thead>
-        <tr>
-          <th>Work Order</th>
-          <th>Vehicle ID</th>
-          <th>Issue</th>
-          <th>Priority</th>
-          <th>Opened</th>
-          <th>Closed</th>
-          <th>Cost</th>
-          <th>Downtime</th>
-        </tr>
-      </thead>
+        <section className="panel full-panel">
+          <div className="panel-header">
+            <div>
+              <h2>PySpark Silver GPS</h2>
+              <p>
+                Processed GPS records:
+                <strong> {silverGps.length.toLocaleString()}</strong>
+              </p>
+            </div>
+          </div>
 
-      <tbody>
-        {maintenance.map((record) => (
-          <tr key={record.maintenance_key}>
-            <td>{record.work_order_id}</td>
-            <td>{record.vehicle_id}</td>
-            <td>{record.issue}</td>
-            <td>{record.priority}</td>
-            <td>{record.opened_at}</td>
-            <td>{record.closed_at}</td>
-            <td>₹{record.cost}</td>
-            <td>{record.downtime_hours} hrs</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-</section>
-<section className="silver-gps-section">
-  <h2>Silver GPS Data</h2>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Vehicle</th>
+                  <th>Timestamp</th>
+                  <th>Latitude</th>
+                  <th>Longitude</th>
+                  <th>Speed</th>
+                </tr>
+              </thead>
 
-  <div className="silver-gps-card">
-    <p>
-      GPS records processed by PySpark: <strong>{silverGps.length}</strong>
-    </p>
+              <tbody>
+                {silverGps.slice(0, 10).map((gps, index) => (
+                  <tr key={`${gps.vehicle_id}-${gps.timestamp}-${index}`}>
+                    <td>{gps.vehicle_id}</td>
+                    <td>{gps.timestamp}</td>
+                    <td>{gps.latitude}</td>
+                    <td>{gps.longitude}</td>
+                    <td>{gps.speed} km/h</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-    <div className="silver-gps-table">
-      <table>
-        <thead>
-          <tr>
-            <th>Vehicle ID</th>
-            <th>Timestamp</th>
-            <th>Latitude</th>
-            <th>Longitude</th>
-            <th>Speed (km/h)</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {silverGps.slice(0, 10).map((gps, index) => (
-            <tr key={`${gps.vehicle_id}-${gps.timestamp}-${index}`}>
-              <td>{gps.vehicle_id}</td>
-              <td>{gps.timestamp}</td>
-              <td>{gps.latitude}</td>
-              <td>{gps.longitude}</td>
-              <td>{gps.speed}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</section>
-
-<section className="ml-prediction-section">
-  <h2>ML Fuel Prediction</h2>
-
-  <div className="ml-prediction-card">
-    <div>
-      <p>Distance</p>
-      <h3>{fuelPrediction?.distance_km ?? 0} km</h3>
-    </div>
-
-    <div>
-      <p>Speed</p>
-      <h3>{fuelPrediction?.speed_kmh ?? 0} km/h</h3>
-    </div>
-
-    <div>
-      <p>Fuel Level</p>
-      <h3>{fuelPrediction?.fuel_level ?? 0}%</h3>
-    </div>
-
-    <div>
-      <p>Predicted Consumption</p>
-      <h3>
-        {fuelPrediction?.predicted_fuel_consumption ?? 0}
-      </h3>
-    </div>
-
-    <div>
-      <p>Model</p>
-      <h3>{fuelPrediction?.model ?? "Loading..."}</h3>
-    </div>
-  </div>
-</section>
       </main>
+
+      <footer>
+        FleetVision 360 • Fleet Intelligence Platform
+      </footer>
 
     </div>
   )
 }
 
 export default App
-

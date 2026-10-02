@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import {
   BarChart,
   Bar,
@@ -17,7 +17,77 @@ import {
 
 import "./App.css"
 import "leaflet/dist/leaflet.css"
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet"
+import "leaflet.marker.slideto"
+
+
+function FitFleetBounds({ positions }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!positions || positions.length === 0) {
+      return
+    }
+
+    if (positions.length === 1) {
+      map.setView(positions[0], 12)
+      return
+    }
+
+    const bounds = positions.map(position => position)
+    map.fitBounds(bounds, {
+      padding: [40, 40],
+      maxZoom: 13
+    })
+  }, [positions, map])
+
+  return null
+}
+
+function AnimatedMarker({ gps, vehicleInfo }) {
+  const markerRef = useRef(null)
+
+  useEffect(() => {
+    const marker = markerRef.current
+
+    if (!marker || gps.latitude == null || gps.longitude == null) {
+      return
+    }
+
+    marker.slideTo(
+      [Number(gps.latitude), Number(gps.longitude)],
+      {
+        duration: 9000,
+        keepAtCenter: false
+      }
+    )
+  }, [gps.latitude, gps.longitude])
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={[Number(gps.latitude), Number(gps.longitude)]}
+    >
+      <Popup>
+        <strong>{gps.vehicle_id}</strong>
+        <br />
+        Type: {vehicleInfo?.vehicle_type || vehicleInfo?.type || "Vehicle"}
+        <br />
+        Model: {vehicleInfo?.model || "Fleet Vehicle"}
+        <br />
+        Speed: {Number(gps.speed).toFixed(1)} km/h
+        <br />
+        Status: {
+          Number(gps.speed) === 0
+            ? "Stopped"
+            : Number(gps.speed) < 10
+              ? "Idle"
+              : "Moving"
+        }
+      </Popup>
+    </Marker>
+  )
+}
 
 function App() {
   const API = import.meta.env.VITE_API_URL
@@ -35,6 +105,23 @@ function App() {
   const [maintenanceAnalytics, setMaintenanceAnalytics] = useState([])
   const [lastRefresh, setLastRefresh] = useState(new Date())
   const [loading, setLoading] = useState(false)
+  const [activePage, setActivePage] = useState("Dashboard")
+
+  const pageVisible = (page) => ({
+    display: activePage === page ? "block" : "none"
+  })
+
+  const navigationItems = [
+    { name: "Dashboard", icon: "D" },
+    { name: "Fleet", icon: "F" },
+    { name: "Routes", icon: "R" },
+    { name: "Deliveries", icon: "DL" },
+    { name: "Fuel", icon: "F" },
+    { name: "Maintenance", icon: "M" },
+    { name: "ML Predictions", icon: "ML" },
+    { name: "Alerts", icon: "A" }
+  ]
+
 
   const [vehicleFilter, setVehicleFilter] = useState("All")
   const [routeFilter, setRouteFilter] = useState("All")
@@ -90,6 +177,11 @@ function App() {
     return () => clearInterval(interval)
   }, [])
 
+  const liveAlerts = silverGps
+    .filter(gps => Number(gps.speed) > 70)
+    .sort((a, b) => Number(b.speed) - Number(a.speed))
+    .slice(0, 10)
+
   const latestSilverGps = Object.values(
     silverGps.reduce((latest, gps) => {
       if (
@@ -101,6 +193,34 @@ function App() {
       return latest
     }, {})
   )
+
+  const vehicleTrails = silverGps.reduce((trails, gps) => {
+    if (
+      gps.latitude == null ||
+      gps.longitude == null ||
+      !gps.vehicle_id
+    ) {
+      return trails
+    }
+
+    if (!trails[gps.vehicle_id]) {
+      trails[gps.vehicle_id] = []
+    }
+
+    trails[gps.vehicle_id].push({
+      timestamp: new Date(gps.timestamp).getTime(),
+      position: [Number(gps.latitude), Number(gps.longitude)]
+    })
+
+    return trails
+  }, {})
+
+  Object.keys(vehicleTrails).forEach(vehicleId => {
+    vehicleTrails[vehicleId] = vehicleTrails[vehicleId]
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(-15)
+      .map(point => point.position)
+  })
 
   const getVehicleStatus = (speed) => {
     const value = Number(speed) || 0
@@ -149,6 +269,36 @@ function App() {
   return (
     <div className="app">
 
+      <aside className="sidebar">
+        <div className="sidebar-logo">
+          <div className="logo-mark">FV</div>
+          <div>
+            <h2>FleetVision</h2>
+            <span>360</span>
+          </div>
+        </div>
+
+        <nav className="sidebar-nav">
+          {navigationItems.map((item) => (
+            <button
+              key={item.name}
+              className={`nav-item ${activePage === item.name ? "active" : ""}`}
+              onClick={() => setActivePage(item.name)}
+            >
+              <span className="nav-icon">{item.icon}</span>
+              <span>{item.name}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="sidebar-footer">
+          <span className="online-dot"></span>
+          System Online
+        </div>
+      </aside>
+
+      <main className="main-content">
+
       <header className="header">
         <div>
           <h1>FleetVision 360</h1>
@@ -169,7 +319,7 @@ function App() {
 
       <main>
 
-        <section className="control-panel">
+        <section className="control-panel" style={pageVisible("Dashboard")}>
           <div>
             <label>Vehicle</label>
             <select
@@ -219,14 +369,14 @@ function App() {
           </div>
         </section>
 
-        <section className="page-title">
+        <section className="page-title" style={pageVisible("Dashboard")}>
           <div>
             <h2>Executive Overview</h2>
             <p>Real-time fleet performance and operational intelligence</p>
           </div>
         </section>
 
-        <section className="cards">
+        <section className="cards" style={pageVisible("Dashboard")}>
 
           <div className="card">
             <div className="icon">TR</div>
@@ -272,7 +422,7 @@ function App() {
             <div className="icon">FC</div>
             <div>
               <p>Fuel Cost</p>
-              <h3>₹{Number(dashboard.fuel_cost).toLocaleString("en-IN")}</h3>
+              <h3>&#8377;{Number(dashboard.fuel_cost).toLocaleString("en-IN")}</h3>
             </div>
           </div>
 
@@ -286,7 +436,7 @@ function App() {
 
         </section>
 
-        <section className="analytics-grid">
+        <section className="analytics-grid" style={pageVisible("Dashboard")}>
 
           <div className="panel">
             <div className="panel-header">
@@ -309,7 +459,7 @@ function App() {
                   label
                 >
                   {fleetStatusChart.map((entry, index) => (
-                    <Cell key={index} />
+                    <Cell key={index} fill={["#f59e0b", "#22c55e", "#ef4444"][index % 3]} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -318,6 +468,11 @@ function App() {
             </ResponsiveContainer>
           </div>
 
+
+
+        </section>
+
+        <section className="panel full-panel" style={pageVisible("Deliveries")}>
           <div className="panel">
             <div className="panel-header">
               <div>
@@ -365,15 +520,15 @@ function App() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="Delivered" />
-                <Bar dataKey="Delayed" />
+                <Bar dataKey="Delivered" fill="#22c55e" />
+                <Bar dataKey="Delayed" fill="#ef4444" />
               </BarChart>
             </ResponsiveContainer>
           </div>
-
         </section>
 
-        <section className="analytics-grid">
+
+        <section className="analytics-grid" style={pageVisible("Dashboard")}>
 
           <div className="panel">
             <div className="panel-header">
@@ -390,7 +545,7 @@ function App() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="total_liters" name="Fuel Liters" />
+                <Bar dataKey="total_liters" name="Fuel Liters" fill="#06b6d4" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -409,23 +564,23 @@ function App() {
                 <XAxis dataKey="priority" />
                 <YAxis
                   tickFormatter={value =>
-                    `₹${(value / 100000).toFixed(0)}L`
+                    `${String.fromCharCode(8377)}${(value / 100000).toFixed(0)}L`
                   }
                 />
                 <Tooltip
                   formatter={value =>
-                    `₹${Number(value).toLocaleString("en-IN")}`
+                    `${String.fromCharCode(8377)}${Number(value).toLocaleString("en-IN")}`
                   }
                 />
                 <Legend />
-                <Bar dataKey="total_cost" name="Maintenance Cost" />
+                <Bar dataKey="total_cost" name="Maintenance Cost" fill="#a855f7" />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
         </section>
 
-        <section className="panel full-panel">
+        <section className="panel full-panel" style={pageVisible("Fleet")}>
           <div className="panel-header">
             <div>
               <h2>Live Fleet Map</h2>
@@ -449,29 +604,33 @@ function App() {
                 v => v.vehicle_id === gps.vehicle_id
               )
 
+              const trail = vehicleTrails[gps.vehicle_id] || []
+
               return (
-                <Marker
-                  key={gps.vehicle_id}
-                  position={[gps.latitude, gps.longitude]}
-                >
-                  <Popup>
-                    <strong>{gps.vehicle_id}</strong>
-                    <br />
-                    Type: {vehicleInfo?.type ?? "N/A"}
-                    <br />
-                    Model: {vehicleInfo?.model ?? "N/A"}
-                    <br />
-                    Speed: {gps.speed} km/h
-                    <br />
-                    Status: {getVehicleStatus(gps.speed)}
-                  </Popup>
-                </Marker>
+                <div key={gps.vehicle_id} style={{ display: "contents" }}>
+                  {trail.length > 1 && (
+                    <Polyline
+                      positions={trail}
+                      pathOptions={{
+                        color: "#22c55e",
+                        weight: 4,
+                        opacity: 0.75
+                      }}
+                    />
+                  )}
+
+                  <AnimatedMarker
+                    gps={gps}
+                    vehicleInfo={vehicleInfo}
+                  />
+
+                </div>
               )
             })}
           </MapContainer>
         </section>
 
-        <section className="panel full-panel">
+        <section className="panel full-panel" style={pageVisible("Fleet")}>
           <div className="panel-header">
             <div>
               <h2>Fleet Operations</h2>
@@ -516,92 +675,91 @@ function App() {
           </div>
         </section>
 
-        <section className="analytics-grid">
-
-          <div className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>Routes</h2>
-                <p>Route network overview</p>
-              </div>
+        <section className="panel full-panel" style={pageVisible("Routes")}>
+          <div className="panel-header">
+            <div>
+              <h2>Routes</h2>
+              <p>Route network overview</p>
             </div>
+          </div>
 
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Route</th>
-                    <th>Origin</th>
-                    <th>Destination</th>
-                    <th>Distance</th>
-                    <th>Duration</th>
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Route</th>
+                  <th>Origin</th>
+                  <th>Destination</th>
+                  <th>Distance</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredRoutes.slice(0, 12).map(route => (
+                  <tr key={route.route_key}>
+                    <td><strong>{route.route_id}</strong></td>
+                    <td>{route.origin}</td>
+                    <td>{route.destination}</td>
+                    <td>{route.distance_km} km</td>
+                    <td>{route.expected_duration_min} min</td>
                   </tr>
-                </thead>
-
-                <tbody>
-                  {filteredRoutes.slice(0, 12).map(route => (
-                    <tr key={route.route_key}>
-                      <td><strong>{route.route_id}</strong></td>
-                      <td>{route.origin}</td>
-                      <td>{route.destination}</td>
-                      <td>{route.distance_km} km</td>
-                      <td>{route.expected_duration_min} min</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          <div className="panel">
-            <div className="panel-header">
-              <div>
-                <h2>ML Fuel Prediction</h2>
-                <p>Machine-learning consumption estimate</p>
-              </div>
-              <span className="ml-badge">ML</span>
-            </div>
-
-            <div className="ml-grid">
-              <div>
-                <span>Distance</span>
-                <strong>{fuelPrediction?.distance_km ?? 0} km</strong>
-              </div>
-
-              <div>
-                <span>Speed</span>
-                <strong>{fuelPrediction?.speed_kmh ?? 0} km/h</strong>
-              </div>
-
-              <div>
-                <span>Fuel Level</span>
-                <strong>{fuelPrediction?.fuel_level ?? 0}%</strong>
-              </div>
-
-              <div>
-                <span>Predicted Consumption</span>
-                <strong>
-                  {fuelPrediction?.predicted_fuel_consumption ?? 0}
-                </strong>
-              </div>
-            </div>
-
-            <div className="model-name">
-              Model: {fuelPrediction?.model ?? "Loading..."}
-            </div>
-          </div>
-
         </section>
 
-        <section className="panel full-panel">
+        <section className="panel full-panel" style={pageVisible("ML Predictions")}>
+          <div className="panel-header">
+            <div>
+              <h2>ML Fuel Prediction</h2>
+              <p>Machine-learning consumption estimate</p>
+            </div>
+            <span className="ml-badge">ML</span>
+          </div>
+
+          <div className="ml-grid">
+            <div>
+              <span>Distance</span>
+              <strong>{fuelPrediction?.distance_km ?? 0} km</strong>
+            </div>
+
+            <div>
+              <span>Speed</span>
+              <strong>{fuelPrediction?.speed_kmh ?? 0} km/h</strong>
+            </div>
+
+            <div>
+              <span>Fuel Level</span>
+              <strong>{fuelPrediction?.fuel_level ?? 0}%</strong>
+            </div>
+
+            <div>
+              <span>Predicted Consumption</span>
+              <strong>{fuelPrediction?.predicted_fuel_consumption ?? 0}</strong>
+            </div>
+          </div>
+
+          <div className="model-name">
+            Model: {fuelPrediction?.model ?? "Loading..."}
+          </div>
+        </section>
+
+        <section className="panel full-panel" style={pageVisible("Alerts")}>
           <div className="panel-header">
             <div>
               <h2>Operational Alerts</h2>
-              <p>Exceptions requiring attention</p>
+              <p>Live exceptions detected from incoming GPS data</p>
             </div>
           </div>
 
           <div className="alerts-grid">
+            <div className="alert-card">
+              <strong>{liveAlerts.length}</strong>
+              <span>Live Overspeed Alerts</span>
+            </div>
+
             <div className="alert-card">
               <strong>{fleetStatus?.stopped ?? 0}</strong>
               <span>Stopped Vehicles</span>
@@ -616,15 +774,43 @@ function App() {
               <strong>{deliveryPerformance?.delayed ?? 0}</strong>
               <span>Delayed Deliveries</span>
             </div>
+          </div>
 
-            <div className="alert-card">
-              <strong>{maintenance.length}</strong>
-              <span>Maintenance Orders</span>
-            </div>
+          <div className="table-container" style={{ marginTop: "20px" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Vehicle</th>
+                  <th>Speed</th>
+                  <th>Status</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {liveAlerts.length > 0 ? (
+                  liveAlerts.map((gps, index) => (
+                    <tr key={`${gps.vehicle_id}-${gps.timestamp}-${index}`}>
+                      <td>{gps.vehicle_id}</td>
+                      <td>{Number(gps.speed).toFixed(1)} km/h</td>
+                      <td>
+                        <span className="status-pill delayed">Overspeed</span>
+                      </td>
+                      <td>{gps.timestamp}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4">
+                      No live overspeed alerts detected
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
 
-        <section className="panel full-panel">
+        <section className="panel full-panel" style={pageVisible("Fuel")}>
           <div className="panel-header">
             <div>
               <h2>Fuel Records</h2>
@@ -652,7 +838,7 @@ function App() {
                     <td>{record.timestamp}</td>
                     <td>{record.fuel_type}</td>
                     <td>{record.liters} L</td>
-                    <td>₹{Number(record.amount).toLocaleString("en-IN")}</td>
+                    <td>?{Number(record.amount).toLocaleString("en-IN")}</td>
                     <td>{record.odometer_km} km</td>
                   </tr>
                 ))}
@@ -661,7 +847,7 @@ function App() {
           </div>
         </section>
 
-        <section className="panel full-panel">
+        <section className="panel full-panel" style={pageVisible("Maintenance")}>
           <div className="panel-header">
             <div>
               <h2>Maintenance Records</h2>
@@ -689,7 +875,7 @@ function App() {
                     <td>{record.vehicle_id}</td>
                     <td>{record.issue}</td>
                     <td>{record.priority}</td>
-                    <td>₹{Number(record.cost).toLocaleString("en-IN")}</td>
+                    <td>?{Number(record.cost).toLocaleString("en-IN")}</td>
                     <td>{record.downtime_hours} hrs</td>
                   </tr>
                 ))}
@@ -698,7 +884,7 @@ function App() {
           </div>
         </section>
 
-        <section className="panel full-panel">
+        <section className="panel full-panel" style={pageVisible("Fleet")}>
           <div className="panel-header">
             <div>
               <h2>PySpark Silver GPS</h2>
@@ -742,6 +928,7 @@ function App() {
         FleetVision 360 • Fleet Intelligence Platform
       </footer>
 
+    </main>
     </div>
   )
 }
